@@ -1,50 +1,29 @@
-# 📊 Economic Data Science Portfolio
+# Global Purchasing Power Parity Analysis via the Big Mac Index
 
-Welcome! This repository showcases my journey in **ECON 3916: Statistical & Machine Learning for Economics**, where I'm learning to bridge traditional economic theory with modern data science techniques.
+## Objective
+This project applies the Big Mac Index methodology to empirically test the **Law of One Price** and assess currency valuation across 19 countries relative to the US Dollar, using purchasing power parity (PPP) as the theoretical framework.
 
-## 👋 About Me
+## Methodology
 
-I'm an undergraduate economics student passionate about using data to solve real-world problems. I'm actively seeking opportunities in **data analysis** and **economic consulting**, where I can apply both rigorous economic thinking and cutting-edge analytical tools.
+* **Data Ingestion**: Manually constructed a structured dataset from The Economist's January 2015 Big Mac Index, capturing local prices, exchange rates, and geographic identifiers across major economies
+* **PPP Calculation**: Computed the implied purchasing power parity exchange rate for each currency by normalizing local Big Mac prices against the US benchmark price
+* **Valuation Analysis**: Quantified currency misalignment by comparing implied PPP rates to actual market exchange rates, expressed as percentage deviation
+* **Visualization**: Generated horizontal bar charts to illustrate the spectrum of currency over/undervaluation, with negative values indicating undervaluation and positive values indicating overvaluation
 
-My goal is to demonstrate how economists can leverage machine learning not just for prediction, but to enhance causal inference and policy analysis—bridging the gap between traditional econometrics and modern data science.
+## Key Findings
 
-## 📚 About This Portfolio
+Based on January 2015 data, the analysis revealed significant currency misalignments:
 
-This repository contains my coursework, labs, and projects from ECON 3916. The course takes a **"Concept Extension" approach**: we start with foundational statistical concepts (like OLS regression) and scale them up using machine learning algorithms (like Lasso, Ridge, and ensemble methods).
+* **Most Overvalued**: The Norwegian Krone (NOK) exhibited the strongest overvaluation at approximately **+31.5%** relative to PPP, suggesting the Big Mac was substantially more expensive in Norway than fundamental purchasing power would predict
+* **Most Undervalued**: The Russian Ruble (RUB) showed severe undervaluation at approximately **-71.6%**, reflecting currency depreciation and potential arbitrage opportunities
+* **Near Fair Value**: The Euro area currencies (EUR) and Australian Dollar (AUD) traded close to their implied PPP values, indicating relative equilibrium
+* **Emerging Market Pattern**: Most emerging market currencies (China, Indonesia, Egypt, South Africa) demonstrated undervaluation ranging from -40% to -55%, consistent with the Balassa-Samuelson effect
 
-Through this work, I'm developing skills in:
-- **Causal Inference**: Understanding what drives economic outcomes
-- **Predictive Analytics**: Building models that forecast and classify
-- **Statistical Learning**: Applying regularization, cross-validation, and model selection
-- **Economic Applications**: Translating technical results into policy-relevant insights
+## Economic Interpretation
 
-## 🛠️ Tech Stack
-
-This portfolio leverages modern tools for economic data analysis:
-
-- **Python** 🐍 – Core programming language
-- **Pandas** – Data manipulation and analysis
-- **Scikit-Learn** – Machine learning algorithms and model evaluation
-- **Statsmodels** – Statistical modeling and econometric analysis
-- **Google Colab** – Cloud-based development environment
-- **Jupyter Notebooks** – Interactive analysis and documentation
-
-## 📂 Repository Structure
-```
-├── labs/           # Weekly lab assignments
-├── projects/       # Course projects and case studies
-├── notes/          # Key concepts and methodologies
-└── data/           # Datasets used in analysis
-```
-
-## 🚀 What's Inside
-
-As I progress through the course, you'll find examples of:
-- Regression analysis and regularization techniques
-- Classification and prediction models
-- Model selection and validation strategies
-- Applications to labor economics, policy evaluation, and more
+The results support the view that the Law of One Price holds imperfectly in the short run due to trade barriers, non-tradable components (labor, rent), and market frictions. Currency deviations from PPP may signal future exchange rate adjustments, though market forces, capital flows, and monetary policy can sustain misalignments for extended periods.
 
 ---
 
-💡 *This portfolio is actively updated as I learn new techniques and complete coursework. Feel free to explore, and don't hesitate to reach out with questions or opportunities!*
+**Tools Used**: Python, Pandas, Matplotlib, Seaborn  
+**Data Source**: The Economist Big Mac Index (January 2015)
