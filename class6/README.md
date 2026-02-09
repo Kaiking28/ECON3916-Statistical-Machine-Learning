@@ -1,145 +1,132 @@
-Lab 5: The Architecture of Bias
-Overview
-This lab conducts a systematic forensic investigation into Data Generating Processes (DGP) and Sampling Bias in machine learning pipelines. Using the Titanic dataset as a pedagogical sandbox, I demonstrate how seemingly innocuous sampling decisions introduce measurable statistical bias that compromises model generalization.
-Technical Implementation
-Tech Stack
+# Lab 5: The Architecture of Bias
 
-Python 3.x
-pandas & numpy: Data manipulation and simulation
-scipy.stats: Chi-Square goodness-of-fit testing
-sklearn.model_selection: Stratified sampling implementation
-seaborn: Dataset provisioning
+## Overview
+An empirical investigation into the **Data Generating Process (DGP)** and the statistical pathologies that emerge when sampling mechanisms fail. This lab exposes the hidden architectures that create bias in machine learning pipelines—from simple random sampling variance to systematic covariate shift and survivorship bias.
 
-Methodology
-1. Simple Random Sampling (SRS) — The Variance Problem
-Objective: Quantify sampling error under naive randomization.
+## Tech Stack
+- **Python 3.x**
+- **pandas** - Data manipulation and analysis
+- **numpy** - Random sampling and numerical operations
+- **scipy** - Chi-Square statistical testing
+- **scikit-learn** - Stratified sampling implementation
+- **seaborn** - Titanic dataset
 
-Manually shuffled the Titanic population using np.random.permutation()
-Applied an 80/20 train-test split on shuffled indices
-Result: Computed the delta (bias) between train/test survival rates to demonstrate high variance inherent to SRS when dealing with imbalanced outcomes
+## Methodology
 
-pythondelta = |train_survival_rate - test_survival_rate|
+### 1. Simple Random Sampling (SRS) & Variance Demonstration
+Manually simulated the classic "shuffle and split" approach on the Titanic dataset to expose its fundamental weakness:
+
+```
+Random Permutation → 80/20 Split → Bias Measurement (Delta)
 ```
 
-**Finding**: SRS produces non-identical distributions across splits, violating the i.i.d. assumption required for valid generalization bounds.
+**Key Insight:** Even with proper randomization, SRS produces **high sampling variance**. The train/test survival rates deviate significantly due to chance alone—a form of Monte Carlo noise that destabilizes model evaluation.
+
+### 2. Stratified Sampling (Variance Reduction)
+Implemented **stratified random sampling** using `sklearn.model_selection.train_test_split()` with the `stratify` parameter to enforce distributional constraints:
+
+```python
+train_test_split(df, stratify=df['pclass'], test_size=0.2)
+```
+
+**Outcome:** Eliminated **Covariate Shift** by guaranteeing identical class distributions (1st/2nd/3rd class passengers) across train and test sets. This reduces sampling variance and ensures the test set is a representative microcosm of the population.
+
+### 3. Sample Ratio Mismatch (SRM) Forensic Audit
+Conducted a statistical quality control audit using **Chi-Square tests** to detect engineering failures in A/B testing infrastructure:
+
+```
+H₀: Observed split ratio = Expected ratio (e.g., 50/50)
+H₁: Systematic deviation detected (bot traffic, logging bugs)
+```
+
+**Application:** SRM detection is critical in production environments where silent data corruption can invalidate experimental results. A significant χ² statistic flags non-random assignment mechanisms.
 
 ---
 
-#### 2. Stratified Sampling — Eliminating Covariate Shift
-**Objective**: Enforce distributional invariance across train/test partitions.
+## Theoretical Deep Dive: Survivorship Bias & The Ghost Data Problem
 
-- Implemented `sklearn.train_test_split()` with `stratify=df['pclass']`
-- Verified that passenger class proportions remained identical across splits
-- **Result**: Eliminated *Covariate Shift* in the feature space, ensuring test set representativeness
+### The TechCrunch Unicorn Paradox
 
-**Why this matters**: Covariate Shift occurs when P(X) differs between train and test, causing models to fail on out-of-distribution data. Stratification is a hard constraint that preserves marginal distributions.
+**Question:** Why does analyzing only successful Unicorn startups lead to Survivorship Bias, and what specific type of Ghost Data is needed to fix it using a Heckman Correction?
 
----
+### The Bias Mechanism
 
-#### 3. Sample Ratio Mismatch (SRM) Detection — A/B Test Forensics
-**Objective**: Detect engineering failures in experimental designs.
+When you scrape TechCrunch for Unicorn case studies, you're observing a **selected sample**—companies that survived multiple filters:
 
-- Applied **Chi-Square goodness-of-fit tests** to A/B test traffic splits
-- Tested null hypothesis: H₀: Observed ratios match expected design ratios
-- **Result**: SRM detection flags data pipeline bugs (e.g., bot traffic, logging errors, bucketing failures) that invalidate causal inference
+1. **Selection Filter 1:** Survived Series A, B, C funding rounds
+2. **Selection Filter 2:** Achieved $1B+ valuation
+3. **Selection Filter 3:** Received media coverage
 
-**Real-world impact**: Companies like Booking.com have documented cases where undetected SRM led to incorrect product decisions affecting millions of users.
+This creates **Survivorship Bias** because your dataset is systematically missing the counterfactual: startups that failed at each stage. You're analyzing `P(Strategy | Unicorn)` when you actually need `P(Unicorn | Strategy)`.
 
----
+**The Result:** Any pattern you find (e.g., "All unicorns pivoted twice!") is contaminated because you can't see the failures who also pivoted twice but died anyway.
 
-## Theoretical Deep Dive: Survivorship Bias in Unicorn Startup Analysis
+### The Ghost Data Requirement
 
-### The Question
-*"Why does analyzing only successful Unicorn startups (on TechCrunch) lead to Survivorship Bias, and what specific type of Ghost Data would I need to fix it using a Heckman Correction?"*
+To apply a **Heckman Selection Correction**, you need two types of data:
 
-### The Diagnosis
+#### 1. **Outcome Equation Data** (What you have)
+- Features of successful unicorns: team size, funding amount, pivot count, etc.
+- Outcome: Valuation, growth rate, exit multiple
 
-**Survivorship Bias** occurs when your dataset is *selection-conditioned* on an outcome of interest. TechCrunch articles about unicorns represent a **non-random sample** from the universe of all startups:
+#### 2. **Selection Equation Data** (The Ghost Data you're missing)
+This is the critical piece:
+
+- **The full population of startups that *entered* the race**, including those that:
+  - Failed to raise Series A
+  - Shut down after Series B
+  - Became profitable small businesses (never sought unicorn status)
+  - Exited via acquisition before $1B valuation
+
+**Specifically, you need:**
 ```
-P(Observed | Unicorn Status = 1) ≠ P(All Startups)
+Ghost Data = {
+  startup_id,
+  features_at_founding (team, market, tech),
+  selection_indicator (1 = became observable unicorn, 0 = disappeared),
+  exclusion_restriction (instrument that predicts selection but not outcome)
+}
 ```
 
-**The Problem**: 
-- You only observe startups that *survived* to reach $1B+ valuation
-- The features you measure (founder pedigree, market timing, pivot strategy) are **post-hoc rationalizations**
-- The true Data Generating Process includes thousands of failed startups with *identical early characteristics* that never made TechCrunch
+### The Heckman Two-Stage Solution
 
-**Classic Example**: "All successful founders dropped out of college" ← You never counted the thousands of dropouts running failed startups in obscurity.
+**Stage 1 (Selection Model):**  
+Estimate `P(Observable as Unicorn | Founding Characteristics)` using a **probit model** on the *full population* (including ghosts):
 
----
-
-### The Ghost Data You Need
-
-To apply a **Heckman Correction** (the econometric solution to sample selection bias), you require:
-
-#### 1. **The Censored Population** (Ghost Data Type 1)
-- **All startups** that raised a seed round in the same cohort, not just unicorns
-- This includes: Failed startups, lifestyle businesses, acqui-hires, zombie companies
-- **Why**: You need the denominator to estimate P(Unicorn | Features)
-
-#### 2. **The Selection Mechanism** (Ghost Data Type 2)
-- Variables that predict *being observed* (appearing on TechCrunch) but don't directly cause unicorn status
-- Examples:
-  - Founder's social media follower count (drives media coverage)
-  - Geographic proximity to tech journalists
-  - PR budget expenditure
-  - Participation in high-profile accelerators (YC, Techstars)
-
-**Why this matters**: These are **exclusion restrictions** — variables correlated with selection but not with the outcome, conditional on other features.
-
----
-
-### The Heckman Two-Step Procedure
-
-**Step 1: Selection Equation** (Probit Model)
 ```
-P(Observed on TechCrunch) = Φ(α₀ + α₁·Features + α₂·ExclusionRestrictions)
+Pr(Selected = 1) = Φ(Z₁γ)
 ```
-Estimate the *inverse Mills ratio* (λ) from this model.
 
-**Step 2: Outcome Equation** (Corrected Regression)
+Where Z₁ includes variables like: VC network density, founder geography, macro funding climate (instruments that affect *visibility* but not necessarily *success quality*).
+
+**Stage 2 (Outcome Model):**  
+Use the **Inverse Mills Ratio** (λ) from Stage 1 as a control variable when modeling outcomes *among observed unicorns*:
+
 ```
-P(Unicorn Status | Observed) = β₀ + β₁·Features + β₂·λ + ε
+ln(Valuation) = Xβ + ρλ + ε
 ```
-The λ term corrects for selection bias by modeling the unobserved correlation between "being in the sample" and "becoming a unicorn."
 
----
+The λ term corrects for the fact that observed unicorns are a non-random sample—it adjusts for the correlation between selection and unobserved outcome determinants.
 
-### The Verdict
+### The Brutal Truth
 
-Without the **ghost data** of failed startups and selection mechanism variables, any analysis of TechCrunch unicorns will:
-1. Overestimate the causal effect of "success factors"
-2. Ignore the base rate of failure (P(Unicorn) ≈ 0.001%)
-3. Produce non-generalizable insights for aspiring founders
-
-**Heckman Correction transforms the question** from:
-- ❌ "What do unicorns have in common?" 
-- ✅ "What predicts unicorn status *after controlling for the fact that we only observe survivors*?"
+Without ghost data on failed startups, **no statistical technique can fully recover causal effects**. The Heckman correction requires you to model *why* companies become observable, which is impossible if you only have data on survivors. This is why industry "best practices" derived from unicorn case studies often fail catastrophically when applied to the broader startup ecosystem.
 
 ---
 
 ## Key Takeaways
 
-1. **Sampling is not neutral** — Every data collection method encodes assumptions about the DGP
-2. **Stratification is insurance** — It enforces distributional invariants that SRS cannot guarantee
-3. **SRM detection is defensive engineering** — Chi-Square tests catch pipeline bugs before they corrupt experiments
-4. **Selection bias is invisible** — Without the counterfactual (ghost data), you're fitting models to an illusion
+1. **Sampling isn't neutral** - The mechanism by which data enters your pipeline determines what biases emerge
+2. **Stratification beats randomization** - When you know the DGP structure, enforce it
+3. **Selection creates ghost dimensions** - The most dangerous bias comes from data you *can't* see
+4. **Trust, but verify** - Even in production systems, SRM audits are essential quality controls
+
+## Files
+- `lab5_bias_architecture.ipynb` - Full implementation and experiments
+- `README.md` - This document
 
 ---
 
-## Repository Structure
-```
-lab5-architecture-of-bias/
-├── notebook.ipynb          # Full implementation
-├── data/
-│   └── titanic.csv         # Dataset (loaded via seaborn)
-├── figures/
-│   ├── sampling_variance.png
-│   └── stratified_comparison.png
-└── README.md               # This file
-
-References
-
-Kohavi, R., et al. (2020). Online Controlled Experiments at Scale
-Heckman, J. (1979). "Sample Selection Bias as a Specification Error"
-Pearl, J. (2009). Causality: Models, Reasoning, and Inference
+**Status:** Complete ✅  
+**Author:** [Your Name]  
+**Date:** February 2026
