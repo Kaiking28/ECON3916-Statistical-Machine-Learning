@@ -1,16 +1,19 @@
+import os
 import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import joblib 
+import joblib
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 st.set_page_config(page_title="County Income Predictor", layout="wide")
 
 @st.cache_resource
 def load_artifacts():
-    model         = joblib.load("model.pkl")
-    feature_names = joblib.load("feature_names.pkl")
-    cv_rmse       = joblib.load("cv_rmse.pkl")
+    model         = joblib.load(os.path.join(BASE_DIR, "model.pkl"))
+    feature_names = joblib.load(os.path.join(BASE_DIR, "feature_names.pkl"))
+    cv_rmse       = joblib.load(os.path.join(BASE_DIR, "cv_rmse.pkl"))
     return model, feature_names, cv_rmse
 
 model, feature_names, cv_rmse = load_artifacts()
