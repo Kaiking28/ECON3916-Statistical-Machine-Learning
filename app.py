@@ -15,38 +15,55 @@ def load_artifacts():
 
 model, feature_names, cv_rmse = load_artifacts()
 
-# Slider config for every feature the model knows about.
-# collar_ratio is computed, so it has no slider entry — the app skips it automatically.
-SLIDER_CFG = {
-    "labor_force_pct":   dict(label="Labor Force Participation (%)",      min_value=20.0, max_value=87.0, value=58.7, step=0.1),
-    "unemployment_rate": dict(label="Unemployment Rate (%)",               min_value=0.0,  max_value=29.0, value=4.5,  step=0.1),
-    "mean_commute_min":  dict(label="Mean Commute Time (min)",             min_value=4.0,  max_value=50.0, value=24.2, step=0.5),
-    "pct_mgmt":          dict(label="Management / Professional Occ. (%)",  min_value=6.0,  max_value=75.0, value=34.6, step=0.1),
-    "pct_service":       dict(label="Service Occupations (%)",             min_value=0.0,  max_value=42.0, value=16.6, step=0.1),
-    "pct_sales":         dict(label="Sales & Office Occupations (%)",      min_value=2.0,  max_value=36.0, value=19.2, step=0.1),
-    "pct_construction":  dict(label="Construction & Extraction Occ. (%)",  min_value=1.0,  max_value=39.0, value=11.7, step=0.1),
-    "pct_production":    dict(label="Production & Transport Occ. (%)",     min_value=0.0,  max_value=46.0, value=15.9, step=0.1),
-    "pct_insured":       dict(label="Health Insurance Coverage (%)",       min_value=55.0, max_value=100.0,value=92.3, step=0.1),
-    "pct_poverty":       dict(label="Population Below Poverty Line (%)",   min_value=0.0,  max_value=63.0, value=9.2,  step=0.1),
+# ACS national medians and std devs from df.describe() (3,220 counties)
+ACS_STATS = {
+    "labor_force_pct":   dict(median=58.7, std=7.8,  min=20.0, max=87.0, default=58.7),
+    "unemployment_rate": dict(median=4.5,  std=2.7,  min=0.0,  max=29.0, default=4.5),
+    "mean_commute_min":  dict(median=24.2, std=5.7,  min=4.0,  max=50.0, default=24.2),
+    "pct_mgmt":          dict(median=34.6, std=7.4,  min=6.0,  max=75.0, default=34.6),
+    "pct_service":       dict(median=16.6, std=3.8,  min=0.0,  max=42.0, default=16.6),
+    "pct_sales":         dict(median=19.2, std=3.1,  min=2.0,  max=36.0, default=19.2),
+    "pct_construction":  dict(median=11.7, std=4.1,  min=1.0,  max=39.0, default=11.7),
+    "pct_production":    dict(median=15.9, std=5.7,  min=0.0,  max=46.0, default=15.9),
+    "pct_insured":       dict(median=92.3, std=4.9,  min=55.0, max=100.0,default=92.3),
+    "pct_poverty":       dict(median=9.2,  std=7.1,  min=0.0,  max=63.0, default=9.2),
 }
 
-# ── Sidebar: show a slider for every feature_name that has a config entry ─────
+LABELS = {
+    "labor_force_pct":   "Labor Force Participation (%)",
+    "unemployment_rate": "Unemployment Rate (%)",
+    "mean_commute_min":  "Mean Commute Time (min)",
+    "pct_mgmt":          "Management / Professional Occ. (%)",
+    "pct_service":       "Service Occupations (%)",
+    "pct_sales":         "Sales & Office Occupations (%)",
+    "pct_construction":  "Construction & Extraction Occ. (%)",
+    "pct_production":    "Production & Transport Occ. (%)",
+    "pct_insured":       "Health Insurance Coverage (%)",
+    "pct_poverty":       "Population Below Poverty Line (%)",
+    "collar_ratio":      "Collar Ratio (engineered)",
+}
+
+# ── Sidebar sliders ───────────────────────────────────────────────────────────
 st.sidebar.header("County Characteristics")
-st.sidebar.caption("Ranges from 2024 ACS 5-Year Estimates, 3,220 U.S. counties.")
+st.sidebar.caption("2024 ACS 5-Year Estimates — 3,220 U.S. counties.")
 
 slider_vals = {}
 for feat in feature_names:
-    if feat in SLIDER_CFG:
-        slider_vals[feat] = st.sidebar.slider(**SLIDER_CFG[feat])
+    if feat in ACS_STATS:
+        s = ACS_STATS[feat]
+        slider_vals[feat] = st.sidebar.slider(
+            LABELS[feat], min_value=s["min"], max_value=s["max"],
+            value=s["default"], step=0.1
+        )
 
-# Compute engineered feature from sliders — must happen before prediction
+# Engineered feature computed from sliders before prediction
 if "collar_ratio" in feature_names:
     slider_vals["collar_ratio"] = (
         (slider_vals["pct_mgmt"] + slider_vals["pct_sales"])
         / (slider_vals["pct_construction"] + slider_vals["pct_production"] + 0.01)
     )
 
-# Build input DataFrame in the exact column order from feature_names.pkl
+# Build input in exact feature_names order
 input_df = pd.DataFrame([[slider_vals[f] for f in feature_names]], columns=feature_names)
 
 # ── Prediction ────────────────────────────────────────────────────────────────
@@ -54,37 +71,37 @@ prediction = float(model.predict(input_df)[0])
 lower      = max(prediction - cv_rmse, 0)
 upper      = prediction + cv_rmse
 
+# ── Header ────────────────────────────────────────────────────────────────────
 st.title("U.S. County Median Household Income Predictor")
 st.markdown(
     "**Use case:** Federal agencies (HUD / USDA Rural Development) screening counties for "
-    "economic development grants. Counties where actual income falls well below the prediction "
-    "may signal structural disadvantage worth investigating."
+    "economic development grants. Counties whose actual income falls well below the model's "
+    "prediction may signal structural disadvantage beyond what their labor-market profile explains."
 )
 st.caption(
     "Data: 2024 U.S. Census Bureau ACS 5-Year Estimates — Economic Characteristics (DP03)."
 )
 
+# ── Prediction metrics ────────────────────────────────────────────────────────
 st.subheader("Predicted Median Household Income")
 col1, col2, col3 = st.columns(3)
 col1.metric("Lower Bound", f"${lower:,.0f}",      help=f"Prediction − CV RMSE (±${cv_rmse:,.0f})")
 col2.metric("Prediction",  f"${prediction:,.0f}")
 col3.metric("Upper Bound", f"${upper:,.0f}",      help=f"Prediction + CV RMSE (±${cv_rmse:,.0f})")
-
 st.caption(
-    f"Uncertainty based on 5-fold CV RMSE of **${cv_rmse:,.0f}** (CV R² = 0.83). "
-    "Reflects average model error on held-out counties, not a statistical confidence interval."
+    f"Prediction interval based on 5-fold CV RMSE of **${cv_rmse:,.0f}** (CV R² = 0.83). "
+    "Reflects average model error on held-out counties."
 )
 
-# ── Grant screening signal ────────────────────────────────────────────────────
+# ── Grant flag ────────────────────────────────────────────────────────────────
 st.divider()
 st.subheader("Grant Screening Signal")
 actual = st.number_input(
     "Enter county's actual ACS median income (optional):",
     min_value=0, max_value=250_000, value=0, step=1_000,
-    help="If provided, compares actual to predicted to flag structural underperformance."
 )
 if actual > 0:
-    gap     = prediction - actual
+    gap = prediction - actual
     pct_gap = gap / prediction * 100
     if gap > cv_rmse:
         st.error(
@@ -103,40 +120,141 @@ if actual > 0:
             "No structural underperformance signal."
         )
 
-# ── Feature importance chart ───────────────────────────────────────────────────
+# ── Tabs for three charts ─────────────────────────────────────────────────────
 st.divider()
-st.subheader("Feature Importances")
-st.caption(
-    ":orange[**Predictive, not causal.**] Shows which features the model relied on most — "
-    "not whether changing a feature would change income."
+tab1, tab2, tab3 = st.tabs(
+    ["County Profile vs. National Median", "Prediction Sensitivity", "Feature Importances"]
 )
 
-imp_df = (
-    pd.DataFrame({"Feature": feature_names, "Importance": model.feature_importances_})
-    .sort_values("Importance")
-)
+# ── Tab 1: County Profile (INTERACTIVE — updates with every slider change) ────
+with tab1:
+    st.markdown(
+        "Each bar shows how far this county's inputs deviate from the **national ACS median**, "
+        "measured in standard deviations. Move the sliders to see the profile update."
+    )
+    base_feats = [f for f in feature_names if f in ACS_STATS]
+    z_scores   = [
+        (slider_vals[f] - ACS_STATS[f]["median"]) / ACS_STATS[f]["std"]
+        for f in base_feats
+    ]
+    labels_short = [LABELS[f] for f in base_feats]
 
-fig, ax = plt.subplots(figsize=(8, 4.5))
-colors = ["#d62728" if f == "pct_poverty" else "#4C72B0" for f in imp_df["Feature"]]
-bars = ax.barh(imp_df["Feature"], imp_df["Importance"], color=colors)
-ax.set_xlabel("Mean Decrease in Impurity (normalized)")
-ax.set_title("Random Forest Feature Importances  —  Predictive, not causal", fontsize=11)
-ax.spines[["top", "right"]].set_visible(False)
-for bar, val in zip(bars, imp_df["Importance"]):
-    ax.text(val + 0.003, bar.get_y() + bar.get_height() / 2,
-            f"{val:.3f}", va="center", fontsize=8)
-fig.tight_layout()
-st.pyplot(fig)
+    fig1, ax1 = plt.subplots(figsize=(8, 4.5))
+    colors1 = ["#d62728" if z < 0 else "#2ca02c" for z in z_scores]
+    ax1.barh(labels_short, z_scores, color=colors1)
+    ax1.axvline(0, color="black", linewidth=0.8)
+    ax1.set_xlabel("Standard Deviations from National Median")
+    ax1.set_title("County Profile vs. National ACS Median  (updates with sliders)", fontsize=11)
+    ax1.spines[["top", "right"]].set_visible(False)
+    for i, z in enumerate(z_scores):
+        ax1.text(z + (0.05 if z >= 0 else -0.05), i,
+                 f"{z:+.2f}σ", va="center",
+                 ha="left" if z >= 0 else "right", fontsize=8)
+    fig1.tight_layout()
+    st.pyplot(fig1)
+
+# ── Tab 2: Sensitivity tornado (INTERACTIVE — updates with every slider change)
+with tab2:
+    st.markdown(
+        "For each feature, this chart shows how the **predicted income would change** if that "
+        "feature moved to its ACS minimum or maximum while all other sliders stay fixed. "
+        "Move the sliders to see how sensitivity shifts for this specific county configuration."
+    )
+
+    base_vals = {f: slider_vals[f] for f in feature_names}
+    sens_rows = []
+
+    for feat in feature_names:
+        if feat not in ACS_STATS:
+            continue
+        lo_val  = ACS_STATS[feat]["min"]
+        hi_val  = ACS_STATS[feat]["max"]
+
+        # prediction at feature min
+        lo_inputs = base_vals.copy()
+        lo_inputs[feat] = lo_val
+        if "collar_ratio" in feature_names:
+            lo_inputs["collar_ratio"] = (
+                (lo_inputs["pct_mgmt"] + lo_inputs["pct_sales"])
+                / (lo_inputs["pct_construction"] + lo_inputs["pct_production"] + 0.01)
+            )
+        lo_pred = float(model.predict(
+            pd.DataFrame([[lo_inputs[f] for f in feature_names]], columns=feature_names)
+        )[0])
+
+        # prediction at feature max
+        hi_inputs = base_vals.copy()
+        hi_inputs[feat] = hi_val
+        if "collar_ratio" in feature_names:
+            hi_inputs["collar_ratio"] = (
+                (hi_inputs["pct_mgmt"] + hi_inputs["pct_sales"])
+                / (hi_inputs["pct_construction"] + hi_inputs["pct_production"] + 0.01)
+            )
+        hi_pred = float(model.predict(
+            pd.DataFrame([[hi_inputs[f] for f in feature_names]], columns=feature_names)
+        )[0])
+
+        sens_rows.append({
+            "Feature": LABELS[feat],
+            "lo_delta": lo_pred - prediction,
+            "hi_delta": hi_pred - prediction,
+            "swing":    abs(hi_pred - lo_pred),
+        })
+
+    sens_df = pd.DataFrame(sens_rows).sort_values("swing")
+
+    fig2, ax2 = plt.subplots(figsize=(8, 4.5))
+    y_pos = range(len(sens_df))
+    for i, row in enumerate(sens_df.itertuples()):
+        lo, hi = sorted([row.lo_delta, row.hi_delta])
+        ax2.barh(i, hi - lo, left=lo,
+                 color="#4C72B0", alpha=0.75, height=0.6)
+    ax2.set_yticks(list(y_pos))
+    ax2.set_yticklabels(sens_df["Feature"], fontsize=8)
+    ax2.axvline(0, color="black", linewidth=0.8)
+    ax2.set_xlabel("Change in Predicted Income ($) from Current Prediction")
+    ax2.set_title(
+        "Prediction Sensitivity: min→max range of each feature\n(all others held at current slider values)",
+        fontsize=10
+    )
+    ax2.xaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: f"${x:,.0f}"))
+    ax2.spines[["top", "right"]].set_visible(False)
+    fig2.tight_layout()
+    st.pyplot(fig2)
+
+# ── Tab 3: Feature Importances (static — from model.pkl) ─────────────────────
+with tab3:
+    st.caption(
+        ":orange[**Predictive, not causal.**] Importance scores reflect which features the "
+        "model relied on most during training — not whether changing a feature causes income to change."
+    )
+    imp_df = (
+        pd.DataFrame({"Feature": [LABELS[f] for f in feature_names],
+                      "Importance": model.feature_importances_})
+        .sort_values("Importance")
+    )
+    fig3, ax3 = plt.subplots(figsize=(8, 4.5))
+    colors3 = ["#d62728" if "Poverty" in f else "#4C72B0" for f in imp_df["Feature"]]
+    bars3 = ax3.barh(imp_df["Feature"], imp_df["Importance"], color=colors3)
+    ax3.set_xlabel("Mean Decrease in Impurity (normalized)")
+    ax3.set_title("Random Forest Feature Importances  —  Predictive, not causal", fontsize=11)
+    ax3.spines[["top", "right"]].set_visible(False)
+    for bar, val in zip(bars3, imp_df["Importance"]):
+        ax3.text(val + 0.003, bar.get_y() + bar.get_height() / 2,
+                 f"{val:.3f}", va="center", fontsize=8)
+    fig3.tight_layout()
+    st.pyplot(fig3)
 
 # ── collar_ratio detail ────────────────────────────────────────────────────────
 if "collar_ratio" in feature_names:
     st.divider()
     with st.expander("collar_ratio — engineered feature"):
         cr = slider_vals["collar_ratio"]
+        idx = list(feature_names).index("collar_ratio")
         st.markdown(
             f"**collar\\_ratio** = (pct\\_mgmt + pct\\_sales) / (pct\\_construction + pct\\_production + 0.01)\n\n"
             f"Current value: **{cr:.3f}**  |  "
-            f"Feature importance: **{model.feature_importances_[list(feature_names).index('collar_ratio')]:.3f}**\n\n"
-            "Captures white-collar vs. blue-collar occupation share. "
+            f"Feature importance: **{model.feature_importances_[idx]:.3f}**\n\n"
+            "Higher values indicate a workforce skewed toward white-collar occupations. "
             "The +0.01 offset prevents division by zero."
         )
