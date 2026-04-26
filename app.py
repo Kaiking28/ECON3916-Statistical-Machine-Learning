@@ -120,10 +120,10 @@ if actual > 0:
             "No structural underperformance signal."
         )
 
-# ── Tabs for three charts ─────────────────────────────────────────────────────
+# ── Tabs for two charts ───────────────────────────────────────────────────────
 st.divider()
-tab1, tab2, tab3 = st.tabs(
-    ["County Profile vs. National Median", "Prediction Sensitivity", "Feature Importances"]
+tab1, tab3 = st.tabs(
+    ["County Profile vs. National Median", "Feature Importances"]
 )
 
 # ── Tab 1: County Profile (INTERACTIVE — updates with every slider change) ────
@@ -153,76 +153,7 @@ with tab1:
     fig1.tight_layout()
     st.pyplot(fig1)
 
-# ── Tab 2: Sensitivity tornado (INTERACTIVE — updates with every slider change)
-with tab2:
-    st.markdown(
-        "For each feature, this chart shows how the **predicted income would change** if that "
-        "feature moved to its ACS minimum or maximum while all other sliders stay fixed. "
-        "Move the sliders to see how sensitivity shifts for this specific county configuration."
-    )
-
-    base_vals = {f: slider_vals[f] for f in feature_names}
-    sens_rows = []
-
-    for feat in feature_names:
-        if feat not in ACS_STATS:
-            continue
-        lo_val  = ACS_STATS[feat]["min"]
-        hi_val  = ACS_STATS[feat]["max"]
-
-        # prediction at feature min
-        lo_inputs = base_vals.copy()
-        lo_inputs[feat] = lo_val
-        if "collar_ratio" in feature_names:
-            lo_inputs["collar_ratio"] = (
-                (lo_inputs["pct_mgmt"] + lo_inputs["pct_sales"])
-                / (lo_inputs["pct_construction"] + lo_inputs["pct_production"] + 0.01)
-            )
-        lo_pred = float(model.predict(
-            pd.DataFrame([[lo_inputs[f] for f in feature_names]], columns=feature_names)
-        )[0])
-
-        # prediction at feature max
-        hi_inputs = base_vals.copy()
-        hi_inputs[feat] = hi_val
-        if "collar_ratio" in feature_names:
-            hi_inputs["collar_ratio"] = (
-                (hi_inputs["pct_mgmt"] + hi_inputs["pct_sales"])
-                / (hi_inputs["pct_construction"] + hi_inputs["pct_production"] + 0.01)
-            )
-        hi_pred = float(model.predict(
-            pd.DataFrame([[hi_inputs[f] for f in feature_names]], columns=feature_names)
-        )[0])
-
-        sens_rows.append({
-            "Feature": LABELS[feat],
-            "lo_delta": lo_pred - prediction,
-            "hi_delta": hi_pred - prediction,
-            "swing":    abs(hi_pred - lo_pred),
-        })
-
-    sens_df = pd.DataFrame(sens_rows).sort_values("swing")
-
-    fig2, ax2 = plt.subplots(figsize=(8, 4.5))
-    y_pos = range(len(sens_df))
-    for i, row in enumerate(sens_df.itertuples()):
-        lo, hi = sorted([row.lo_delta, row.hi_delta])
-        ax2.barh(i, hi - lo, left=lo,
-                 color="#4C72B0", alpha=0.75, height=0.6)
-    ax2.set_yticks(list(y_pos))
-    ax2.set_yticklabels(sens_df["Feature"], fontsize=8)
-    ax2.axvline(0, color="black", linewidth=0.8)
-    ax2.set_xlabel("Change in Predicted Income ($) from Current Prediction")
-    ax2.set_title(
-        "Prediction Sensitivity: min→max range of each feature\n(all others held at current slider values)",
-        fontsize=10
-    )
-    ax2.xaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: f"${x:,.0f}"))
-    ax2.spines[["top", "right"]].set_visible(False)
-    fig2.tight_layout()
-    st.pyplot(fig2)
-
-# ── Tab 3: Feature Importances (static — from model.pkl) ─────────────────────
+# ── Tab 2: Feature Importances (static — from model.pkl) ─────────────────────
 with tab3:
     st.caption(
         ":orange[**Predictive, not causal.**] Importance scores reflect which features the "
