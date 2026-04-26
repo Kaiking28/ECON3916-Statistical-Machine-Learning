@@ -128,6 +128,7 @@ tab1, tab3 = st.tabs(
 
 # ── Tab 1: County Profile (INTERACTIVE — updates with every slider change) ────
 with tab1:
+    st.info("Make sure you select each county characteristic in the sidebar to see the visualization update.")
     st.markdown(
         "Each bar shows how far this county's inputs deviate from the **national ACS median**, "
         "measured in standard deviations. Move the sliders to see the profile update."
